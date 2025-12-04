@@ -3,116 +3,241 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Onchain TicTacToe</title>
+    <title>Onchain Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
     <script src="https://unpkg.com/@metamask/detect-provider/dist/detect-provider.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="box">
-      <h1>Onchain TicTacToe</h1>
-
-      <div class="row">
-        <button id="connect">Connect MetaMask</button>
-        <button id="refresh" class="secondary">Refresh</button>
-      </div>
-
-      <div class="hr"></div>
-      <div class="kv mono small">
-        <div>Network</div>
-        <div id="net">—</div>
-        <div>Account</div>
-        <div id="acct">—</div>
-        <div>Contract Address</div>
-        <div id="addr">0x2dA8Edf5D07628A0FB9224fef70c56ec691cefa9</div>
-        <div>Stake Option 0</div>
-        <div id="stake0">—</div>
-        <div>Stake Option 1</div>
-        <div id="stake1">—</div>
-        <div>Stake Option 2</div>
-        <div id="stake2">—</div>
-        <div>Next Game ID</div>
-        <div id="nextGameId">—</div>
-        <div>Your Balance</div>
-        <div id="balance">—</div>
-      </div>
-
-      <div class="hr"></div>
-      <h3>Recent Game Events</h3>
-      <div class="small muted">Live feed of game events from the contract.</div>
-      <div id="game_events" class="event-log">
-        <div class="event-empty">
-          No game events yet. Connect wallet to start listening.
+    <!-- Top Header with Wallet Connection -->
+    <div class="top-header">
+      <div class="header-content">
+        <div class="header-left"></div>
+        <div class="header-right">
+          <div class="wallet-prompt" id="wallet_prompt">
+            <button id="connect_selection" class="arcade-button small">
+              CONNECT WALLET
+            </button>
+          </div>
+          <div
+            class="wallet-connected"
+            id="wallet_connected"
+            style="display: none"
+          >
+            <span class="wallet-address" id="wallet_address_selection">—</span>
+            <button
+              id="disconnect_selection"
+              class="arcade-button secondary small"
+            >
+              DISCONNECT
+            </button>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="hr"></div>
-      <h3>Create Game</h3>
-      <div class="small muted">
-        Select a stake option and create a new game.
+    <!-- Game Selection Screen -->
+    <div id="game_selection_screen" class="screen">
+      <div class="arcade-container">
+        <h1 class="arcade-title">ONCHAIN ARCADE</h1>
+        <div class="games-grid" id="games_grid">
+          <!-- Games will be populated by JavaScript -->
+        </div>
       </div>
-      <label>Stake Option</label>
-      <select id="stake_select">
-        <option value="0">Option 0 (—)</option>
-        <option value="1">Option 1 (—)</option>
-        <option value="2">Option 2 (—)</option>
-      </select>
-      <button id="btn_create" style="margin-top: 10px">Create Game</button>
-      <div id="create_status" class="small muted"></div>
+    </div>
 
-      <div class="hr"></div>
-      <h3>Available Games</h3>
-      <div class="small muted">Games waiting for player O to join.</div>
-      <div id="available_games" class="games-list">
-        <div class="event-empty">No available games. Create one above!</div>
-      </div>
+    <!-- Main Game View -->
+    <div id="main_game_view" class="screen" style="display: none">
+      <div class="arcade-container">
+        <!-- Header with back button and debug toggle -->
+        <div class="game-header">
+          <button id="back_to_selection" class="arcade-button secondary">
+            ← BACK
+          </button>
+          <h2 class="game-title" id="current_game_title">TIC TAC TOE</h2>
+          <button id="debug_toggle" class="arcade-button secondary">
+            DEBUG
+          </button>
+        </div>
 
-      <div class="hr"></div>
-      <h3>Current Game</h3>
-      <div class="small muted">View and play a specific game.</div>
-      <label>Game ID</label>
-      <input type="text" id="game_id_input" placeholder="Enter game ID" />
-      <button id="btn_load_game" style="margin-top: 10px">Load Game</button>
-      <div
-        id="game_info"
-        class="kv mono small"
-        style="margin-top: 16px; display: none"
-      >
-        <div>Game ID</div>
-        <div id="game_id_display">—</div>
-        <div>Player X</div>
-        <div id="player_x">—</div>
-        <div>Player O</div>
-        <div id="player_o">—</div>
-        <div>Status</div>
-        <div id="game_status">—</div>
-        <div>Turn</div>
-        <div id="game_turn">—</div>
-        <div>Move Count</div>
-        <div id="move_count">—</div>
-        <div>Winner</div>
-        <div id="game_winner">—</div>
-        <div>Stake</div>
-        <div id="game_stake">—</div>
-      </div>
-      <div id="game_board_container" style="margin-top: 16px; display: none">
-        <div id="game_board" class="board"></div>
-        <div
-          id="board_status"
-          class="small muted"
-          style="margin-top: 10px"
-        ></div>
-        <button id="btn_make_move" style="margin-top: 10px; display: none">
-          Make Move
-        </button>
-        <div id="move_status" class="small muted"></div>
-      </div>
+        <!-- Arcade Game View (Default) -->
+        <div class="arcade-game-view">
+          <!-- Player Info with Wallet Actions -->
+          <div class="player-info">
+            <div class="player-card">
+              <div class="player-label">YOU</div>
+              <div class="player-address" id="arcade_player_address">—</div>
+              <div class="player-balance">
+                Balance: <span id="arcade_balance">—</span>
+              </div>
+              <div class="wallet-actions">
+                <button id="arcade_btn_withdraw" class="arcade-button">
+                  WITHDRAW
+                </button>
+                <div id="arcade_withdraw_status" class="status-message"></div>
+              </div>
+            </div>
+            <div class="player-card">
+              <div class="player-label">OPPONENT</div>
+              <div class="player-address" id="arcade_opponent_address">—</div>
+            </div>
+          </div>
 
-      <div class="hr"></div>
-      <h3>Withdraw</h3>
-      <div class="small muted">Withdraw your winnings from the contract.</div>
-      <button id="btn_withdraw">Withdraw</button>
-      <div id="withdraw_status" class="small muted"></div>
+          <!-- Game Sections -->
+          <div class="game-sections">
+            <!-- Active Game Section -->
+            <div class="active-game-section">
+              <h3 class="section-title">ACTIVE GAME</h3>
+
+              <!-- Game Status Display -->
+              <div class="game-status-display" id="arcade_game_status">
+                Select or create a game to start!
+              </div>
+
+              <!-- Game Board Container -->
+              <div id="arcade_game_board_container" style="display: none">
+                <div id="arcade_game_board" class="arcade-board"></div>
+              </div>
+
+              <!-- Make Move Button -->
+              <div class="make-move-container">
+                <button
+                  id="arcade_btn_make_move"
+                  class="arcade-button"
+                  style="display: none"
+                >
+                  MAKE MOVE
+                </button>
+                <div id="arcade_move_status" class="status-message"></div>
+              </div>
+            </div>
+
+            <!-- Find/Start Game Section -->
+            <div class="find-start-section">
+              <h3 class="section-title">FIND / START GAME</h3>
+
+              <div class="action-group">
+                <label class="arcade-label">Stake</label>
+                <select id="arcade_stake_select" class="arcade-select">
+                  <option value="0">Option 0 (—)</option>
+                  <option value="1">Option 1 (—)</option>
+                  <option value="2">Option 2 (—)</option>
+                </select>
+                <button id="arcade_btn_create" class="arcade-button">
+                  CREATE GAME
+                </button>
+                <div id="arcade_create_status" class="status-message"></div>
+              </div>
+
+              <div class="action-group">
+                <label class="arcade-label">Load Game ID</label>
+                <div class="row">
+                  <input
+                    type="text"
+                    id="arcade_game_id_input"
+                    class="arcade-input"
+                    placeholder="Enter game ID"
+                  />
+                  <button id="arcade_btn_load_game" class="arcade-button">
+                    LOAD
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Available Games Section -->
+            <div class="available-games-section">
+              <div class="action-group">
+                <h3 class="section-title">AVAILABLE GAMES</h3>
+                <div id="arcade_available_games" class="arcade-games-list">
+                  <div class="event-empty">
+                    No available games. Create one above!
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Debug Panel (Hidden by default) -->
+        <div id="debug_panel" class="debug-panel" style="display: none">
+          <h3 class="debug-title">DEBUG INFO</h3>
+
+          <div class="debug-section">
+            <h4>Connection Info</h4>
+            <div class="kv mono small">
+              <div>Network</div>
+              <div id="net">—</div>
+              <div>Account</div>
+              <div id="acct">—</div>
+              <div>Contract Address</div>
+              <div id="addr">0x2dA8Edf5D07628A0FB9224fef70c56ec691cefa9</div>
+            </div>
+          </div>
+
+          <div class="debug-section">
+            <h4>Contract State</h4>
+            <div class="kv mono small">
+              <div>Stake Option 0</div>
+              <div id="stake0">—</div>
+              <div>Stake Option 1</div>
+              <div id="stake1">—</div>
+              <div>Stake Option 2</div>
+              <div id="stake2">—</div>
+              <div>Next Game ID</div>
+              <div id="nextGameId">—</div>
+              <div>Your Balance</div>
+              <div id="balance">—</div>
+            </div>
+          </div>
+
+          <div class="debug-section">
+            <h4>Recent Game Events</h4>
+            <div class="small muted">
+              Live feed of game events from the contract.
+            </div>
+            <div id="game_events" class="event-log">
+              <div class="event-empty">
+                No game events yet. Connect wallet to start listening.
+              </div>
+            </div>
+          </div>
+
+          <div class="debug-section">
+            <h4>Current Game Details</h4>
+            <div id="game_info" class="kv mono small" style="display: none">
+              <div>Game ID</div>
+              <div id="game_id_display">—</div>
+              <div>Player X</div>
+              <div id="player_x">—</div>
+              <div>Player O</div>
+              <div id="player_o">—</div>
+              <div>Status</div>
+              <div id="game_status">—</div>
+              <div>Turn</div>
+              <div id="game_turn">—</div>
+              <div>Move Count</div>
+              <div id="move_count">—</div>
+              <div>Winner</div>
+              <div id="game_winner">—</div>
+              <div>Stake</div>
+              <div id="game_stake">—</div>
+            </div>
+          </div>
+
+          <div class="debug-section">
+            <button id="refresh" class="arcade-button secondary">
+              REFRESH
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="app.js"></script>

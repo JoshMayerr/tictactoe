@@ -1,60 +1,132 @@
-const CONTRACT_ADDR = "0x2dA8Edf5D07628A0FB9224fef70c56ec691cefa9";
+// Game Registry - Structure for multiple games
+const GAME_REGISTRY = {
+  tictactoe: {
+    id: "tictactoe",
+    name: "TIC TAC TOE",
+    icon: "⭕",
+    description: "Classic 3x3 grid game. Get three in a row to win!",
+    contractAddress: "0x2dA8Edf5D07628A0FB9224fef70c56ec691cefa9",
+    abi: [
+      "function createGame(uint8 stakeIndex) payable returns (uint256)",
+      "function joinGame(uint256 gameId) payable",
+      "function makeMove(uint256 gameId, uint8 position)",
+      "function withdraw()",
+      "function getGameInfo(uint256 gameId) view returns (address playerX, address playerO, uint8 turn, uint8 moveCount, uint8 winner, uint8 stakeIndex, uint8 status)",
+      "function getBoard(uint256 gameId) view returns (uint8[9])",
+      "function STAKE_OPTIONS(uint256) view returns (uint256)",
+      "function nextGameId() view returns (uint256)",
+      "function balances(address) view returns (uint256)",
+      "event GameCreated(uint256 indexed gameId, address indexed playerX, uint8 stakeIndex, uint256 stakeAmount)",
+      "event GameJoined(uint256 indexed gameId, address indexed playerO)",
+      "event MoveMade(uint256 indexed gameId, address indexed player, uint8 position, uint8 symbol)",
+      "event GameWon(uint256 indexed gameId, address indexed winner, uint256 prize)",
+      "event GameDraw(uint256 indexed gameId, uint256 refundEach)",
+    ],
+    init: initTicTacToe,
+    renderGame: renderTicTacToe,
+  },
+};
 
-const ABI = [
-  "function createGame(uint8 stakeIndex) payable returns (uint256)",
-  "function joinGame(uint256 gameId) payable",
-  "function makeMove(uint256 gameId, uint8 position)",
-  "function withdraw()",
-  "function getGameInfo(uint256 gameId) view returns (address playerX, address playerO, uint8 turn, uint8 moveCount, uint8 winner, uint8 stakeIndex, uint8 status)",
-  "function getBoard(uint256 gameId) view returns (uint8[9])",
-  "function STAKE_OPTIONS(uint256) view returns (uint256)",
-  "function nextGameId() view returns (uint256)",
-  "function balances(address) view returns (uint256)",
-  "event GameCreated(uint256 indexed gameId, address indexed playerX, uint8 stakeIndex, uint256 stakeAmount)",
-  "event GameJoined(uint256 indexed gameId, address indexed playerO)",
-  "event MoveMade(uint256 indexed gameId, address indexed player, uint8 position, uint8 symbol)",
-  "event GameWon(uint256 indexed gameId, address indexed winner, uint256 prize)",
-  "event GameDraw(uint256 indexed gameId, uint256 refundEach)",
-];
-
+// Global state
 let provider, signer, contract;
+let currentGame = null;
 let gameEvents = [];
 let currentGameId = null;
 let selectedCell = null;
+let debugPanelVisible = false;
 
-async function connect() {
-  const injected = await detectEthereumProvider();
-  if (!injected) {
-    alert("Install MetaMask");
+// Initialize on page load
+document.addEventListener("DOMContentLoaded", () => {
+  initializeGameSelection();
+  setupEventListeners();
+});
+
+// Game Selection Screen
+function initializeGameSelection() {
+  const gamesGrid = document.getElementById("games_grid");
+  gamesGrid.innerHTML = "";
+
+  Object.values(GAME_REGISTRY).forEach((game) => {
+    const card = document.createElement("div");
+    card.className = "game-card";
+    card.innerHTML = `
+      <div class="game-card-icon">${game.icon}</div>
+      <div class="game-card-title">${game.name}</div>
+      <div class="game-card-desc">${game.description}</div>
+      <button class="arcade-button" onclick="selectGame('${game.id}')">PLAY</button>
+    `;
+    gamesGrid.appendChild(card);
+  });
+}
+
+function selectGame(gameId) {
+  if (!provider || !signer) {
+    alert("Please connect your wallet first!");
     return;
   }
 
-  provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = provider.getSigner();
-  contract = new ethers.Contract(CONTRACT_ADDR, ABI, signer);
+  currentGame = GAME_REGISTRY[gameId];
+  if (!currentGame) {
+    console.error("Game not found:", gameId);
+    return;
+  }
 
-  const net = await provider.getNetwork();
-  document.getElementById("net").textContent =
-    net.name + " (" + net.chainId + ")";
-  document.getElementById("acct").textContent = await signer.getAddress();
+  // Initialize the game
+  currentGame.init();
 
-  await refresh();
+  // Switch to game view
+  document.getElementById("game_selection_screen").style.display = "none";
+  document.getElementById("main_game_view").style.display = "block";
+  document.getElementById("current_game_title").textContent = currentGame.name;
+
+  // Update UI
+  updateArcadeUI();
+}
+
+// Make selectGame available globally
+window.selectGame = selectGame;
+
+// TicTacToe Game Implementation
+function initTicTacToe() {
+  if (!provider || !signer) {
+    return;
+  }
+
+  contract = new ethers.Contract(
+    currentGame.contractAddress,
+    currentGame.abi,
+    signer
+  );
 
   // Set up event listeners
-  contract.on("GameCreated", (gameId, playerX, stakeIndex, stakeAmount, event) => {
-    addGameEvent({
-      type: "GameCreated",
-      gameId: gameId.toString(),
-      playerX,
-      stakeIndex: stakeIndex.toString(),
-      stakeAmount: ethers.utils.formatEther(stakeAmount),
-      blockNumber: event.blockNumber,
-      transactionHash: event.transactionHash,
-      timestamp: new Date().toLocaleTimeString(),
-    });
-    refresh();
-  });
+  setupTicTacToeEventListeners();
+
+  // Initial refresh
+  refresh();
+}
+
+function setupTicTacToeEventListeners() {
+  if (!contract) return;
+
+  // Remove existing listeners if any
+  contract.removeAllListeners();
+
+  contract.on(
+    "GameCreated",
+    (gameId, playerX, stakeIndex, stakeAmount, event) => {
+      addGameEvent({
+        type: "GameCreated",
+        gameId: gameId.toString(),
+        playerX,
+        stakeIndex: stakeIndex.toString(),
+        stakeAmount: ethers.utils.formatEther(stakeAmount),
+        blockNumber: event.blockNumber,
+        transactionHash: event.transactionHash,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      refresh();
+    }
+  );
 
   contract.on("GameJoined", (gameId, playerO, event) => {
     addGameEvent({
@@ -119,6 +191,198 @@ async function connect() {
   });
 }
 
+function renderTicTacToe(board, gameInfo, currentAccount) {
+  const boardEl = document.getElementById("arcade_game_board");
+  boardEl.innerHTML = "";
+
+  const isPlayerX =
+    currentAccount &&
+    currentAccount.toLowerCase() === gameInfo.playerX.toLowerCase();
+  const isPlayerO =
+    currentAccount &&
+    gameInfo.playerO &&
+    currentAccount.toLowerCase() === gameInfo.playerO.toLowerCase();
+  const isMyTurn =
+    (gameInfo.turn === 1 && isPlayerX) || (gameInfo.turn === 2 && isPlayerO);
+  const canMakeMove = gameInfo.status === 1 && isMyTurn;
+
+  let statusText = "";
+  if (gameInfo.status === 0) {
+    statusText = "WAITING FOR PLAYER O TO JOIN...";
+  } else if (gameInfo.status === 2) {
+    if (gameInfo.winner === 0) {
+      statusText = "GAME ENDED IN A DRAW!";
+    } else {
+      const winnerSymbol = gameInfo.winner === 1 ? "X" : "O";
+      statusText = `GAME WON BY ${winnerSymbol}!`;
+    }
+  } else {
+    const turnSymbol = gameInfo.turn === 1 ? "X" : "O";
+    statusText = `CURRENT TURN: ${turnSymbol}`;
+    if (isMyTurn) {
+      statusText += " (YOUR TURN!)";
+    }
+  }
+  document.getElementById("arcade_game_status").textContent = statusText;
+
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("button");
+    cell.className = "cell";
+    cell.dataset.position = i;
+
+    if (board[i] === 1) {
+      cell.textContent = "X";
+      cell.className += " x";
+      cell.disabled = true;
+    } else if (board[i] === 2) {
+      cell.textContent = "O";
+      cell.className += " o";
+      cell.disabled = true;
+    } else {
+      cell.textContent = "";
+      cell.className += " empty";
+      if (canMakeMove) {
+        cell.onclick = () => selectCell(i);
+      } else {
+        cell.disabled = true;
+      }
+    }
+
+    boardEl.appendChild(cell);
+  }
+
+  // Show/hide make move button
+  const makeMoveBtn = document.getElementById("arcade_btn_make_move");
+  if (canMakeMove && selectedCell !== null) {
+    makeMoveBtn.style.display = "block";
+    makeMoveBtn.onclick = () => makeMove(currentGameId);
+  } else {
+    makeMoveBtn.style.display = "none";
+  }
+}
+
+// Event Listeners Setup
+function setupEventListeners() {
+  // Game selection screen
+  document.getElementById("connect_selection").onclick = connect;
+  document.getElementById("disconnect_selection").onclick = disconnect;
+
+  // Main game view
+  document.getElementById("back_to_selection").onclick = () => {
+    document.getElementById("game_selection_screen").style.display = "block";
+    document.getElementById("main_game_view").style.display = "none";
+    currentGame = null;
+    currentGameId = null;
+  };
+
+  document.getElementById("debug_toggle").onclick = toggleDebugPanel;
+  document.getElementById("refresh").onclick = refresh;
+
+  // Arcade game actions
+  document.getElementById("arcade_btn_create").onclick = createGame;
+  document.getElementById("arcade_btn_load_game").onclick = async () => {
+    const gameId = document.getElementById("arcade_game_id_input").value;
+    if (!gameId) {
+      alert("Enter a game ID");
+      return;
+    }
+    await loadGame(parseInt(gameId));
+  };
+  document.getElementById("arcade_btn_make_move").onclick = () =>
+    makeMove(currentGameId);
+  document.getElementById("arcade_btn_withdraw").onclick = withdraw;
+}
+
+// Wallet Connection
+async function connect() {
+  const injected = await detectEthereumProvider();
+  if (!injected) {
+    alert("Install MetaMask");
+    return;
+  }
+
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = provider.getSigner();
+
+  const address = await signer.getAddress();
+  const net = await provider.getNetwork();
+
+  // Update UI
+  document.getElementById("wallet_prompt").style.display = "none";
+  document.getElementById("wallet_connected").style.display = "block";
+  document.getElementById("wallet_address_selection").textContent =
+    address.substring(0, 6) + "..." + address.substring(address.length - 4);
+
+  // Update debug panel
+  document.getElementById("net").textContent =
+    net.name + " (" + net.chainId + ")";
+  document.getElementById("acct").textContent = address;
+
+  // If a game is selected, initialize it
+  if (currentGame) {
+    currentGame.init();
+  }
+
+  await refresh();
+  updateArcadeUI();
+}
+
+function disconnect() {
+  provider = null;
+  signer = null;
+  contract = null;
+
+  document.getElementById("wallet_prompt").style.display = "block";
+  document.getElementById("wallet_connected").style.display = "none";
+
+  // Clear debug panel
+  document.getElementById("net").textContent = "—";
+  document.getElementById("acct").textContent = "—";
+
+  updateArcadeUI();
+}
+
+// Debug Panel Toggle
+function toggleDebugPanel() {
+  debugPanelVisible = !debugPanelVisible;
+  const panel = document.getElementById("debug_panel");
+  panel.style.display = debugPanelVisible ? "block" : "none";
+
+  // Update button text
+  document.getElementById("debug_toggle").textContent = debugPanelVisible
+    ? "HIDE DEBUG"
+    : "DEBUG";
+}
+
+// Update Arcade UI
+function updateArcadeUI() {
+  if (!signer) {
+    document.getElementById("arcade_player_address").textContent =
+      "NOT CONNECTED";
+    document.getElementById("arcade_balance").textContent = "—";
+    document.getElementById("arcade_opponent_address").textContent = "—";
+    return;
+  }
+
+  signer.getAddress().then((address) => {
+    document.getElementById("arcade_player_address").textContent =
+      address.substring(0, 8) + "..." + address.substring(address.length - 6);
+  });
+
+  if (contract) {
+    signer.getAddress().then((address) => {
+      contract.balances(address).then((balance) => {
+        document.getElementById("arcade_balance").textContent =
+          ethers.utils.formatEther(balance) + " ETH";
+        document.getElementById("balance").textContent =
+          ethers.utils.formatEther(balance) + " ETH";
+      });
+    });
+  }
+}
+
+// Game Events
 function addGameEvent(eventData) {
   gameEvents.unshift(eventData);
   if (gameEvents.length > 20) {
@@ -152,10 +416,18 @@ function updateGameEventsUI() {
         `;
       } else if (event.type === "MoveMade") {
         details = `
-          <div class="event-detail"><strong>gameId:</strong> ${event.gameId}</div>
-          <div class="event-detail"><strong>player:</strong> <span class="mono">${event.player}</span></div>
-          <div class="event-detail"><strong>position:</strong> ${event.position}</div>
-          <div class="event-detail"><strong>symbol:</strong> ${event.symbol === "1" ? "X" : "O"}</div>
+          <div class="event-detail"><strong>gameId:</strong> ${
+            event.gameId
+          }</div>
+          <div class="event-detail"><strong>player:</strong> <span class="mono">${
+            event.player
+          }</span></div>
+          <div class="event-detail"><strong>position:</strong> ${
+            event.position
+          }</div>
+          <div class="event-detail"><strong>symbol:</strong> ${
+            event.symbol === "1" ? "X" : "O"
+          }</div>
         `;
       } else if (event.type === "GameWon") {
         details = `
@@ -182,6 +454,7 @@ function updateGameEventsUI() {
     .join("");
 }
 
+// Refresh
 async function refresh() {
   if (!contract) {
     return;
@@ -193,7 +466,9 @@ async function refresh() {
       contract.STAKE_OPTIONS(1),
       contract.STAKE_OPTIONS(2),
       contract.nextGameId(),
-      signer ? contract.balances(await signer.getAddress()) : Promise.resolve(0),
+      signer
+        ? contract.balances(await signer.getAddress())
+        : Promise.resolve(0),
     ]);
 
     document.getElementById("stake0").textContent =
@@ -207,13 +482,22 @@ async function refresh() {
       ethers.utils.formatEther(balance) + " ETH";
 
     // Update stake select options
-    const stakeSelect = document.getElementById("stake_select");
-    stakeSelect.options[0].text = `Option 0 (${ethers.utils.formatEther(stake0)} ETH)`;
-    stakeSelect.options[1].text = `Option 1 (${ethers.utils.formatEther(stake1)} ETH)`;
-    stakeSelect.options[2].text = `Option 2 (${ethers.utils.formatEther(stake2)} ETH)`;
+    const stakeSelect = document.getElementById("arcade_stake_select");
+    stakeSelect.options[0].text = `Option 0 (${ethers.utils.formatEther(
+      stake0
+    )} ETH)`;
+    stakeSelect.options[1].text = `Option 1 (${ethers.utils.formatEther(
+      stake1
+    )} ETH)`;
+    stakeSelect.options[2].text = `Option 2 (${ethers.utils.formatEther(
+      stake2
+    )} ETH)`;
 
     // Refresh available games
     await refreshAvailableGames();
+
+    // Update arcade UI
+    updateArcadeUI();
   } catch (e) {
     console.error("Refresh error:", e);
   }
@@ -246,7 +530,7 @@ async function refreshAvailableGames() {
       }
     }
 
-    const container = document.getElementById("available_games");
+    const container = document.getElementById("arcade_available_games");
     if (availableGames.length === 0) {
       container.innerHTML =
         '<div class="event-empty">No available games. Create one above!</div>';
@@ -258,11 +542,16 @@ async function refreshAvailableGames() {
         (game) => `
       <div class="game-item">
         <div class="game-item-info">
-          <div class="game-item-title">Game #${game.gameId}</div>
-          <div class="game-item-detail">Player X: <span class="mono">${game.playerX}</span></div>
+          <div class="game-item-title">GAME #${game.gameId}</div>
+          <div class="game-item-detail">Player X: <span class="mono">${game.playerX.substring(
+            0,
+            8
+          )}...${game.playerX.substring(game.playerX.length - 6)}</span></div>
           <div class="game-item-detail">Stake: ${game.stakeAmount} ETH</div>
         </div>
-        <button onclick="joinGame(${game.gameId}, ${game.stakeIndex})">Join Game</button>
+        <button class="arcade-button" onclick="joinGame(${game.gameId}, ${
+          game.stakeIndex
+        })">JOIN</button>
       </div>
     `
       )
@@ -272,13 +561,16 @@ async function refreshAvailableGames() {
   }
 }
 
+// Game Actions
 async function createGame() {
   if (!contract) {
     return alert("Connect wallet first");
   }
 
-  const stakeIndex = parseInt(document.getElementById("stake_select").value);
-  const status = document.getElementById("create_status");
+  const stakeIndex = parseInt(
+    document.getElementById("arcade_stake_select").value
+  );
+  const status = document.getElementById("arcade_create_status");
 
   try {
     const stakeAmount = await contract.STAKE_OPTIONS(stakeIndex);
@@ -292,8 +584,15 @@ async function createGame() {
     status.textContent =
       "Transaction sent! Hash: " + tx.hash + " - Waiting for confirmation...";
     const rcpt = await tx.wait();
-    status.textContent = "Game created! Game ID: " + rcpt.events.find(e => e.event === 'GameCreated').args.gameId.toString() + " - Tx: " + rcpt.transactionHash;
+    const gameId = rcpt.events
+      .find((e) => e.event === "GameCreated")
+      .args.gameId.toString();
+    status.textContent = "Game created! Game ID: " + gameId;
     await refresh();
+
+    // Auto-load the created game
+    document.getElementById("arcade_game_id_input").value = gameId;
+    await loadGame(parseInt(gameId));
   } catch (e) {
     status.textContent = "Error: " + (e?.message || e);
   }
@@ -310,17 +609,22 @@ async function joinGame(gameId, stakeIndex) {
       value: stakeAmount,
       gasLimit: 500000,
     });
-    alert("Transaction sent! Hash: " + tx.hash + " - Waiting for confirmation...");
+    alert(
+      "Transaction sent! Hash: " + tx.hash + " - Waiting for confirmation..."
+    );
     const rcpt = await tx.wait();
     alert("Joined game! Tx: " + rcpt.transactionHash);
     await refresh();
     // Load the game after joining
-    document.getElementById("game_id_input").value = gameId;
+    document.getElementById("arcade_game_id_input").value = gameId;
     await loadGame(gameId);
   } catch (e) {
     alert("Error: " + (e?.message || e));
   }
 }
+
+// Make joinGame available globally
+window.joinGame = joinGame;
 
 async function loadGame(gameId) {
   if (!contract) {
@@ -335,12 +639,12 @@ async function loadGame(gameId) {
 
     currentGameId = gameId;
 
-    // Update game info display
-    document.getElementById("game_info").style.display = "grid";
+    // Update debug game info display
+    const gameInfoEl = document.getElementById("game_info");
+    gameInfoEl.style.display = "grid";
     document.getElementById("game_id_display").textContent = gameId.toString();
     document.getElementById("player_x").textContent = gameInfo.playerX;
-    document.getElementById("player_o").textContent =
-      gameInfo.playerO || "—";
+    document.getElementById("player_o").textContent = gameInfo.playerO || "—";
     document.getElementById("game_status").textContent =
       gameInfo.status === 0
         ? "WaitingForO"
@@ -349,87 +653,41 @@ async function loadGame(gameId) {
         : "Finished";
     document.getElementById("game_turn").textContent =
       gameInfo.turn === 1 ? "X" : "O";
-    document.getElementById("move_count").textContent = gameInfo.moveCount.toString();
+    document.getElementById("move_count").textContent =
+      gameInfo.moveCount.toString();
     document.getElementById("game_winner").textContent =
-      gameInfo.winner === 0
-        ? "None/Draw"
-        : gameInfo.winner === 1
-        ? "X"
-        : "O";
+      gameInfo.winner === 0 ? "None/Draw" : gameInfo.winner === 1 ? "X" : "O";
 
     const stakeAmount = await contract.STAKE_OPTIONS(gameInfo.stakeIndex);
     document.getElementById("game_stake").textContent =
       ethers.utils.formatEther(stakeAmount) + " ETH";
 
-    // Update board
+    // Update arcade opponent display
     const currentAccount = signer ? await signer.getAddress() : null;
-    renderBoard(board, gameInfo, currentAccount);
-
-    document.getElementById("game_board_container").style.display = "block";
-  } catch (e) {
-    alert("Error loading game: " + (e?.message || e));
-  }
-}
-
-function renderBoard(board, gameInfo, currentAccount) {
-  const boardEl = document.getElementById("game_board");
-  boardEl.innerHTML = "";
-
-  const isPlayerX = currentAccount && currentAccount.toLowerCase() === gameInfo.playerX.toLowerCase();
-  const isPlayerO = currentAccount && gameInfo.playerO && currentAccount.toLowerCase() === gameInfo.playerO.toLowerCase();
-  const isMyTurn = (gameInfo.turn === 1 && isPlayerX) || (gameInfo.turn === 2 && isPlayerO);
-  const canMakeMove = gameInfo.status === 1 && isMyTurn;
-
-  let statusText = "";
-  if (gameInfo.status === 0) {
-    statusText = "Waiting for player O to join...";
-  } else if (gameInfo.status === 2) {
-    if (gameInfo.winner === 0) {
-      statusText = "Game ended in a draw!";
-    } else {
-      statusText = `Game won by ${gameInfo.winner === 1 ? "X" : "O"}!`;
-    }
-  } else {
-    statusText = `Current turn: ${gameInfo.turn === 1 ? "X" : "O"}`;
-    if (isMyTurn) {
-      statusText += " (Your turn!)";
-    }
-  }
-  document.getElementById("board_status").textContent = statusText;
-
-  for (let i = 0; i < 9; i++) {
-    const cell = document.createElement("button");
-    cell.className = "cell";
-    cell.dataset.position = i;
-
-    if (board[i] === 1) {
-      cell.textContent = "X";
-      cell.className += " x";
-      cell.disabled = true;
-    } else if (board[i] === 2) {
-      cell.textContent = "O";
-      cell.className += " o";
-      cell.disabled = true;
-    } else {
-      cell.textContent = "";
-      cell.className += " empty";
-      if (canMakeMove) {
-        cell.onclick = () => selectCell(i);
+    if (currentAccount) {
+      const isPlayerX =
+        currentAccount.toLowerCase() === gameInfo.playerX.toLowerCase();
+      const opponent = isPlayerX ? gameInfo.playerO : gameInfo.playerX;
+      if (opponent) {
+        document.getElementById("arcade_opponent_address").textContent =
+          opponent.substring(0, 8) +
+          "..." +
+          opponent.substring(opponent.length - 6);
       } else {
-        cell.disabled = true;
+        document.getElementById("arcade_opponent_address").textContent =
+          "WAITING...";
       }
     }
 
-    boardEl.appendChild(cell);
-  }
+    // Update board using game's render function
+    if (currentGame && currentGame.renderGame) {
+      currentGame.renderGame(board, gameInfo, currentAccount);
+    }
 
-  // Show/hide make move button
-  const makeMoveBtn = document.getElementById("btn_make_move");
-  if (canMakeMove && selectedCell !== null) {
-    makeMoveBtn.style.display = "block";
-    makeMoveBtn.onclick = () => makeMove(currentGameId);
-  } else {
-    makeMoveBtn.style.display = "none";
+    document.getElementById("arcade_game_board_container").style.display =
+      "block";
+  } catch (e) {
+    alert("Error loading game: " + (e?.message || e));
   }
 }
 
@@ -439,12 +697,12 @@ function selectCell(position) {
   const cells = document.querySelectorAll(".cell.empty");
   cells.forEach((cell) => {
     if (parseInt(cell.dataset.position) === position) {
-      cell.style.background = "#e3f2fd";
+      cell.classList.add("selected");
     } else {
-      cell.style.background = "white";
+      cell.classList.remove("selected");
     }
   });
-  const makeMoveBtn = document.getElementById("btn_make_move");
+  const makeMoveBtn = document.getElementById("arcade_btn_make_move");
   makeMoveBtn.style.display = "block";
   makeMoveBtn.onclick = () => makeMove(currentGameId);
 }
@@ -458,7 +716,7 @@ async function makeMove(gameId) {
     return alert("Select a cell first");
   }
 
-  const status = document.getElementById("move_status");
+  const status = document.getElementById("arcade_move_status");
   try {
     status.textContent = "Sending tx…";
     const tx = await contract.makeMove(gameId, selectedCell, {
@@ -480,7 +738,7 @@ async function withdraw() {
     return alert("Connect wallet first");
   }
 
-  const status = document.getElementById("withdraw_status");
+  const status = document.getElementById("arcade_withdraw_status");
   try {
     status.textContent = "Sending tx…";
     const tx = await contract.withdraw({
@@ -495,20 +753,3 @@ async function withdraw() {
     status.textContent = "Error: " + (e?.message || e);
   }
 }
-
-// Event listeners
-document.getElementById("connect").onclick = connect;
-document.getElementById("refresh").onclick = refresh;
-document.getElementById("btn_create").onclick = createGame;
-document.getElementById("btn_load_game").onclick = async () => {
-  const gameId = document.getElementById("game_id_input").value;
-  if (!gameId) {
-    alert("Enter a game ID");
-    return;
-  }
-  await loadGame(parseInt(gameId));
-};
-document.getElementById("btn_withdraw").onclick = withdraw;
-
-// Make joinGame available globally for onclick handlers
-window.joinGame = joinGame;

@@ -19,7 +19,6 @@ contract OnchainTicTacToe {
         Status status;
     }
 
-    // Fixed stake options (can be set in constructor)
     uint256[3] public STAKE_OPTIONS;
 
     // All games
@@ -206,17 +205,7 @@ contract OnchainTicTacToe {
         uint8[9] storage b,
         uint8 s
     ) internal view returns (bool) {
-        uint16 win = uint16(0);
-        win |= b[0] == s ? 1 : 0;
-        win |= b[1] == s ? 2 : 0;
-        win |= b[2] == s ? 4 : 0;
-        win |= b[3] == s ? 8 : 0;
-        win |= b[4] == s ? 16 : 0;
-        win |= b[5] == s ? 32 : 0;
-        win |= b[6] == s ? 64 : 0;
-        win |= b[7] == s ? 128 : 0;
-        win |= b[8] == s ? uint16(256) : 0;
-
-        return win == uint16(511); // 0b111111111
+        // TODO: bitwise check for win using bitwise operations
+        return false;
     }
 }
