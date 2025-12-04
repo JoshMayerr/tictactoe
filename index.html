@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Onchain TicTacToe</title>
+    <script src="https://unpkg.com/@metamask/detect-provider/dist/detect-provider.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="box">
+      <h1>Onchain TicTacToe</h1>
+
+      <div class="row">
+        <button id="connect">Connect MetaMask</button>
+        <button id="refresh" class="secondary">Refresh</button>
+      </div>
+
+      <div class="hr"></div>
+      <div class="kv mono small">
+        <div>Network</div>
+        <div id="net">—</div>
+        <div>Account</div>
+        <div id="acct">—</div>
+        <div>Contract Address</div>
+        <div id="addr">0x2dA8Edf5D07628A0FB9224fef70c56ec691cefa9</div>
+        <div>Stake Option 0</div>
+        <div id="stake0">—</div>
+        <div>Stake Option 1</div>
+        <div id="stake1">—</div>
+        <div>Stake Option 2</div>
+        <div id="stake2">—</div>
+        <div>Next Game ID</div>
+        <div id="nextGameId">—</div>
+        <div>Your Balance</div>
+        <div id="balance">—</div>
+      </div>
+
+      <div class="hr"></div>
+      <h3>Recent Game Events</h3>
+      <div class="small muted">Live feed of game events from the contract.</div>
+      <div id="game_events" class="event-log">
+        <div class="event-empty">
+          No game events yet. Connect wallet to start listening.
+        </div>
+      </div>
+
+      <div class="hr"></div>
+      <h3>Create Game</h3>
+      <div class="small muted">
+        Select a stake option and create a new game.
+      </div>
+      <label>Stake Option</label>
+      <select id="stake_select">
+        <option value="0">Option 0 (—)</option>
+        <option value="1">Option 1 (—)</option>
+        <option value="2">Option 2 (—)</option>
+      </select>
+      <button id="btn_create" style="margin-top: 10px">Create Game</button>
+      <div id="create_status" class="small muted"></div>
+
+      <div class="hr"></div>
+      <h3>Available Games</h3>
+      <div class="small muted">Games waiting for player O to join.</div>
+      <div id="available_games" class="games-list">
+        <div class="event-empty">No available games. Create one above!</div>
+      </div>
+
+      <div class="hr"></div>
+      <h3>Current Game</h3>
+      <div class="small muted">View and play a specific game.</div>
+      <label>Game ID</label>
+      <input type="text" id="game_id_input" placeholder="Enter game ID" />
+      <button id="btn_load_game" style="margin-top: 10px">Load Game</button>
+      <div
+        id="game_info"
+        class="kv mono small"
+        style="margin-top: 16px; display: none"
+      >
+        <div>Game ID</div>
+        <div id="game_id_display">—</div>
+        <div>Player X</div>
+        <div id="player_x">—</div>
+        <div>Player O</div>
+        <div id="player_o">—</div>
+        <div>Status</div>
+        <div id="game_status">—</div>
+        <div>Turn</div>
+        <div id="game_turn">—</div>
+        <div>Move Count</div>
+        <div id="move_count">—</div>
+        <div>Winner</div>
+        <div id="game_winner">—</div>
+        <div>Stake</div>
+        <div id="game_stake">—</div>
+      </div>
+      <div id="game_board_container" style="margin-top: 16px; display: none">
+        <div id="game_board" class="board"></div>
+        <div
+          id="board_status"
+          class="small muted"
+          style="margin-top: 10px"
+        ></div>
+        <button id="btn_make_move" style="margin-top: 10px; display: none">
+          Make Move
+        </button>
+        <div id="move_status" class="small muted"></div>
+      </div>
+
+      <div class="hr"></div>
+      <h3>Withdraw</h3>
+      <div class="small muted">Withdraw your winnings from the contract.</div>
+      <button id="btn_withdraw">Withdraw</button>
+      <div id="withdraw_status" class="small muted"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

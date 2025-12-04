@@ -1,0 +1,200 @@
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, sans-serif;
+}
+
+.box {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+label {
+  display: block;
+  margin: 10px 0 6px;
+}
+
+input[type="text"],
+select {
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 6px 10px;
+}
+
+.hr {
+  margin: 12px 0;
+  border-top: 1px solid #ddd;
+}
+
+button {
+  padding: 10px 16px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #45a049;
+}
+
+button.secondary {
+  background: #666;
+}
+
+button.secondary:hover {
+  background: #555;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+.small {
+  font-size: 0.9em;
+}
+
+.muted {
+  color: #666;
+}
+
+.event-log {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.event-item {
+  padding: 8px;
+  margin-bottom: 8px;
+  background: white;
+  border-left: 3px solid #4caf50;
+  border-radius: 2px;
+  font-size: 0.85em;
+}
+
+.event-item:last-child {
+  margin-bottom: 0;
+}
+
+.event-header {
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: #333;
+}
+
+.event-detail {
+  margin: 2px 0;
+  word-break: break-all;
+}
+
+.event-empty {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+.games-list {
+  margin-top: 8px;
+}
+
+.game-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.game-item:last-child {
+  margin-bottom: 0;
+}
+
+.game-item-info {
+  flex: 1;
+}
+
+.game-item-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.game-item-detail {
+  font-size: 0.85em;
+  color: #666;
+  margin: 2px 0;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 300px;
+  margin: 0 auto;
+  background: #333;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  background: white;
+  border: none;
+  font-size: 48px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.cell:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.cell:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.cell.x {
+  color: #2196f3;
+}
+
+.cell.o {
+  color: #f44336;
+}
+
+.cell.empty {
+  color: transparent;
+}
