@@ -25,6 +25,31 @@ const GAME_REGISTRY = {
     init: initTicTacToe,
     renderGame: renderTicTacToe,
   },
+  connect4: {
+    id: "connect4",
+    name: "CONNECT 4",
+    icon: "🔴",
+    description: "Drop pieces into columns. Get four in a row to win!",
+    contractAddress: "0xC21bA6f79E41C9501C013Cf4C17D107682a86fd3",
+    abi: [
+      "function createGame(uint8 stakeIndex) payable returns (uint256)",
+      "function joinGame(uint256 gameId) payable",
+      "function makeMove(uint256 gameId, uint8 column)",
+      "function withdraw()",
+      "function getGameInfo(uint256 gameId) view returns (address playerX, address playerO, uint8 turn, uint8 moveCount, uint8 winner, uint8 stakeIndex, uint8 status)",
+      "function getBoard(uint256 gameId) view returns (uint8[42])",
+      "function STAKE_OPTIONS(uint256) view returns (uint256)",
+      "function nextGameId() view returns (uint256)",
+      "function balances(address) view returns (uint256)",
+      "event GameCreated(uint256 indexed gameId, address indexed playerX, uint8 stakeIndex, uint256 stakeAmount)",
+      "event GameJoined(uint256 indexed gameId, address indexed playerO)",
+      "event MoveMade(uint256 indexed gameId, address indexed player, uint8 column, uint8 row, uint8 symbol)",
+      "event GameWon(uint256 indexed gameId, address indexed winner, uint256 prize)",
+      "event GameDraw(uint256 indexed gameId, uint256 refundEach)",
+    ],
+    init: initConnect4,
+    renderGame: renderConnect4,
+  },
 };
 
 // Global state
@@ -33,6 +58,7 @@ let currentGame = null;
 let gameEvents = [];
 let currentGameId = null;
 let selectedCell = null;
+let selectedColumn = null;
 let debugPanelVisible = false;
 
 // Initialize on page load
@@ -261,6 +287,232 @@ function renderTicTacToe(board, gameInfo, currentAccount) {
   }
 }
 
+// Connect4 Game Implementation
+function initConnect4() {
+  if (!provider || !signer) {
+    return;
+  }
+
+  contract = new ethers.Contract(
+    currentGame.contractAddress,
+    currentGame.abi,
+    signer
+  );
+
+  // Set up event listeners
+  setupConnect4EventListeners();
+
+  // Initial refresh
+  refresh();
+}
+
+function setupConnect4EventListeners() {
+  if (!contract) return;
+
+  // Remove existing listeners if any
+  contract.removeAllListeners();
+
+  contract.on(
+    "GameCreated",
+    (gameId, playerX, stakeIndex, stakeAmount, event) => {
+      addGameEvent({
+        type: "GameCreated",
+        gameId: gameId.toString(),
+        playerX,
+        stakeIndex: stakeIndex.toString(),
+        stakeAmount: ethers.utils.formatEther(stakeAmount),
+        blockNumber: event.blockNumber,
+        transactionHash: event.transactionHash,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      refresh();
+    }
+  );
+
+  contract.on("GameJoined", (gameId, playerO, event) => {
+    addGameEvent({
+      type: "GameJoined",
+      gameId: gameId.toString(),
+      playerO,
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    refresh();
+    if (currentGameId && currentGameId.toString() === gameId.toString()) {
+      loadGame(currentGameId);
+    }
+  });
+
+  contract.on("MoveMade", (gameId, player, column, row, symbol, event) => {
+    addGameEvent({
+      type: "MoveMade",
+      gameId: gameId.toString(),
+      player,
+      column: column.toString(),
+      row: row.toString(),
+      symbol: symbol.toString(),
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    if (currentGameId && currentGameId.toString() === gameId.toString()) {
+      loadGame(currentGameId);
+    }
+  });
+
+  contract.on("GameWon", (gameId, winner, prize, event) => {
+    addGameEvent({
+      type: "GameWon",
+      gameId: gameId.toString(),
+      winner,
+      prize: ethers.utils.formatEther(prize),
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    refresh();
+    if (currentGameId && currentGameId.toString() === gameId.toString()) {
+      loadGame(currentGameId);
+    }
+  });
+
+  contract.on("GameDraw", (gameId, refundEach, event) => {
+    addGameEvent({
+      type: "GameDraw",
+      gameId: gameId.toString(),
+      refundEach: ethers.utils.formatEther(refundEach),
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+    refresh();
+    if (currentGameId && currentGameId.toString() === gameId.toString()) {
+      loadGame(currentGameId);
+    }
+  });
+}
+
+function renderConnect4(board, gameInfo, currentAccount) {
+  const boardEl = document.getElementById("arcade_game_board");
+  boardEl.innerHTML = "";
+  boardEl.className = "connect4-board-wrapper";
+
+  const isPlayerX =
+    currentAccount &&
+    currentAccount.toLowerCase() === gameInfo.playerX.toLowerCase();
+  const isPlayerO =
+    currentAccount &&
+    gameInfo.playerO &&
+    currentAccount.toLowerCase() === gameInfo.playerO.toLowerCase();
+  const isMyTurn =
+    (gameInfo.turn === 1 && isPlayerX) || (gameInfo.turn === 2 && isPlayerO);
+  const canMakeMove = gameInfo.status === 1 && isMyTurn;
+
+  let statusText = "";
+  if (gameInfo.status === 0) {
+    statusText = "WAITING FOR PLAYER O TO JOIN...";
+  } else if (gameInfo.status === 2) {
+    if (gameInfo.winner === 0) {
+      statusText = "GAME ENDED IN A DRAW!";
+    } else {
+      const winnerSymbol = gameInfo.winner === 1 ? "X" : "O";
+      statusText = `GAME WON BY ${winnerSymbol}!`;
+    }
+  } else {
+    const turnSymbol = gameInfo.turn === 1 ? "X" : "O";
+    statusText = `CURRENT TURN: ${turnSymbol}`;
+    if (isMyTurn) {
+      statusText += " (YOUR TURN!)";
+    }
+  }
+  document.getElementById("arcade_game_status").textContent = statusText;
+
+  // Helper function to check if a column is full
+  // Board is stored as: position = row * 7 + column
+  // Top row (row 0) of column col is at position = 0 * 7 + col = col
+  const isColumnFull = (col) => {
+    return board[col] !== 0; // Check top row (row 0) of the column
+  };
+
+  // Create column header buttons
+  const headerRow = document.createElement("div");
+  headerRow.className = "connect4-header-row";
+  for (let col = 0; col < 7; col++) {
+    const headerBtn = document.createElement("button");
+    headerBtn.className = "connect4-column-header";
+    headerBtn.textContent = col + 1;
+    headerBtn.dataset.column = col;
+
+    if (canMakeMove && !isColumnFull(col)) {
+      headerBtn.onclick = () => selectColumn(col);
+      if (selectedColumn === col) {
+        headerBtn.classList.add("selected");
+      }
+    } else {
+      headerBtn.disabled = true;
+    }
+
+    headerRow.appendChild(headerBtn);
+  }
+  boardEl.appendChild(headerRow);
+
+  // Create board cells container
+  const cellsContainer = document.createElement("div");
+  cellsContainer.className = "connect4-board";
+
+  // Create board cells (6 rows × 7 columns)
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 7; col++) {
+      const position = row * 7 + col;
+      const cell = document.createElement("div");
+      cell.className = "connect4-cell";
+      cell.dataset.row = row;
+      cell.dataset.column = col;
+      cell.dataset.position = position;
+
+      if (board[position] === 1) {
+        cell.textContent = "X";
+        cell.className += " x";
+      } else if (board[position] === 2) {
+        cell.textContent = "O";
+        cell.className += " o";
+      } else {
+        cell.textContent = "";
+        cell.className += " empty";
+      }
+
+      cellsContainer.appendChild(cell);
+    }
+  }
+  boardEl.appendChild(cellsContainer);
+
+  // Show/hide make move button
+  const makeMoveBtn = document.getElementById("arcade_btn_make_move");
+  if (canMakeMove && selectedColumn !== null) {
+    makeMoveBtn.style.display = "block";
+    makeMoveBtn.onclick = () => makeMove(currentGameId);
+  } else {
+    makeMoveBtn.style.display = "none";
+  }
+}
+
+function selectColumn(column) {
+  selectedColumn = column;
+  // Update UI to show selected column
+  const headers = document.querySelectorAll(".connect4-column-header");
+  headers.forEach((header) => {
+    if (parseInt(header.dataset.column) === column) {
+      header.classList.add("selected");
+    } else {
+      header.classList.remove("selected");
+    }
+  });
+  const makeMoveBtn = document.getElementById("arcade_btn_make_move");
+  makeMoveBtn.style.display = "block";
+  makeMoveBtn.onclick = () => makeMove(currentGameId);
+}
+
 // Event Listeners Setup
 function setupEventListeners() {
   // Game selection screen
@@ -273,6 +525,8 @@ function setupEventListeners() {
     document.getElementById("main_game_view").style.display = "none";
     currentGame = null;
     currentGameId = null;
+    selectedCell = null;
+    selectedColumn = null;
   };
 
   document.getElementById("debug_toggle").onclick = toggleDebugPanel;
@@ -415,7 +669,25 @@ function updateGameEventsUI() {
           <div class="event-detail"><strong>playerO:</strong> <span class="mono">${event.playerO}</span></div>
         `;
       } else if (event.type === "MoveMade") {
-        details = `
+        // Handle both TicTacToe (position) and Connect4 (column, row)
+        if (event.column !== undefined && event.row !== undefined) {
+          details = `
+          <div class="event-detail"><strong>gameId:</strong> ${
+            event.gameId
+          }</div>
+          <div class="event-detail"><strong>player:</strong> <span class="mono">${
+            event.player
+          }</span></div>
+          <div class="event-detail"><strong>column:</strong> ${
+            event.column
+          }</div>
+          <div class="event-detail"><strong>row:</strong> ${event.row}</div>
+          <div class="event-detail"><strong>symbol:</strong> ${
+            event.symbol === "1" ? "X" : "O"
+          }</div>
+        `;
+        } else {
+          details = `
           <div class="event-detail"><strong>gameId:</strong> ${
             event.gameId
           }</div>
@@ -429,6 +701,7 @@ function updateGameEventsUI() {
             event.symbol === "1" ? "X" : "O"
           }</div>
         `;
+        }
       } else if (event.type === "GameWon") {
         details = `
           <div class="event-detail"><strong>gameId:</strong> ${event.gameId}</div>
@@ -712,14 +985,24 @@ async function makeMove(gameId) {
     return alert("Connect wallet first");
   }
 
-  if (selectedCell === null) {
-    return alert("Select a cell first");
+  // Check which game type we're playing
+  const isConnect4 = currentGame && currentGame.id === "connect4";
+
+  if (isConnect4) {
+    if (selectedColumn === null) {
+      return alert("Select a column first");
+    }
+  } else {
+    if (selectedCell === null) {
+      return alert("Select a cell first");
+    }
   }
 
   const status = document.getElementById("arcade_move_status");
   try {
     status.textContent = "Sending tx…";
-    const tx = await contract.makeMove(gameId, selectedCell, {
+    const moveParam = isConnect4 ? selectedColumn : selectedCell;
+    const tx = await contract.makeMove(gameId, moveParam, {
       gasLimit: 500000,
     });
     status.textContent =
@@ -727,6 +1010,7 @@ async function makeMove(gameId) {
     const rcpt = await tx.wait();
     status.textContent = "Move made! Tx: " + rcpt.transactionHash;
     selectedCell = null;
+    selectedColumn = null;
     await loadGame(gameId);
   } catch (e) {
     status.textContent = "Error: " + (e?.message || e);

@@ -400,6 +400,89 @@ body {
   border-color: #555;
 }
 
+/* Connect4 Board */
+.connect4-board-wrapper {
+  max-width: 500px;
+  margin: 0 auto 20px;
+  background: #000;
+  padding: 8px;
+  border: 2px solid #333;
+}
+
+.connect4-board {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.connect4-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.connect4-column-header {
+  padding: 8px;
+  background: #1a1a1a;
+  border: 2px solid #333;
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  color: #ffd700;
+  cursor: pointer;
+  transition: all 0.1s;
+  text-align: center;
+}
+
+.connect4-column-header:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #555;
+}
+
+.connect4-column-header:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.connect4-column-header:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  color: #7f8c8d;
+}
+
+.connect4-column-header.selected {
+  background: #2a2a2a;
+  border-color: #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.connect4-cell {
+  aspect-ratio: 1;
+  background: #1a1a1a;
+  border: 2px solid #333;
+  font-family: "Press Start 2P", monospace;
+  font-size: 32px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  min-height: 50px;
+}
+
+.connect4-cell.x {
+  color: #3498db;
+  text-shadow: 2px 2px 0px #2980b9;
+}
+
+.connect4-cell.o {
+  color: #e74c3c;
+  text-shadow: 2px 2px 0px #c0392b;
+}
+
+.connect4-cell.empty {
+  color: transparent;
+}
+
 /* Action Group (used in sidebar and sections) */
 .action-group {
   background: #1a1a1a;
@@ -612,5 +695,19 @@ body {
 
   .cell {
     font-size: 40px;
+  }
+
+  .connect4-board-wrapper {
+    max-width: 350px;
+  }
+
+  .connect4-cell {
+    font-size: 24px;
+    min-height: 40px;
+  }
+
+  .connect4-column-header {
+    font-size: 8px;
+    padding: 6px;
   }
 }
